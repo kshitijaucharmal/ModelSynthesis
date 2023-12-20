@@ -20,10 +20,11 @@ public class MSManager : MonoBehaviour {
     // Start is called before the first frame update
     void Start() {
         // Sample Map
-        sampleMap[1, 1, 1] = 1;
-        sampleMap[1, 2, 1] = 2;
-        sampleMap[1, 1, 2] = 3;
-        StartCoroutine(GenerateMap("SampleMap", sampleMap, Vector3.zero));
+        sampleMap[2, 3, 2] = 1;
+        sampleMap[2, 2, 2] = 2;
+        sampleMap[2, 1, 2] = 2;
+        sampleMap[2, 0, 2] = 3;
+        GenerateMap("SampleMap", sampleMap, Vector3.zero);
 
         // Main Map
         for(int i = 0; i < incompleteMap.GetLength(0); i++){
@@ -34,7 +35,7 @@ public class MSManager : MonoBehaviour {
             }
         }
         Vector3 offset = new Vector3(5, 0, 0);
-        StartCoroutine(GenerateMap("MainMap", incompleteMap, offset));
+        GenerateMap("MainMap", incompleteMap, offset);
 
         // Calculate Rules from sample
         CalculateNeighborRules();
@@ -44,7 +45,7 @@ public class MSManager : MonoBehaviour {
     }
 
     // Generate Map Based on map matrix
-    IEnumerator GenerateMap(string mapName, int[,,] map, Vector3 offset){
+    void GenerateMap(string mapName, int[,,] map, Vector3 offset){
         Transform mapParent = Instantiate(new GameObject(name:mapName), transform).transform;
 
         for(int i = 0; i < map.GetLength(0); i++){
@@ -54,12 +55,12 @@ public class MSManager : MonoBehaviour {
                     int tileIndex = map[i, j, k];
                     
                     GameObject model = tileIndex < 0 ? containerTile : tiles[tileIndex];
+                    if (model == null) continue;
                     Vector3 pos = new Vector3(i + offset.x, j + offset.y, k + offset.z);
                     Quaternion rot = Quaternion.identity;
 
                     // Create tile, parent to mapParent
                     Transform tile = Instantiate(model, pos, rot, mapParent).transform;
-                    yield return new WaitForSeconds(0.05f);
                 }
             }
         }
