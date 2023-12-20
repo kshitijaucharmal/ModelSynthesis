@@ -16,6 +16,7 @@ public class MSManager : MonoBehaviour {
     private HashSet<int>[,] rules;
 
     private int[,,] incompleteMap = new int[4,4,4];
+    private ContainerScript[,,] incompleteMapTransforms = new ContainerScript[4,4,4];
 
     // Start is called before the first frame update
     void Start() {
@@ -23,7 +24,11 @@ public class MSManager : MonoBehaviour {
         sampleMap[1, 1, 1] = 1;
         sampleMap[1, 2, 1] = 2;
         sampleMap[1, 1, 2] = 3;
-        StartCoroutine(GenerateMap("SampleMap", sampleMap, Vector3.zero));
+
+        // Calculate Rules from sample Map
+        CalculateNeighborRules();
+
+        GenerateMap("SampleMap", sampleMap, Vector3.zero);
 
         // Main Map
         for(int i = 0; i < incompleteMap.GetLength(0); i++){
@@ -34,17 +39,97 @@ public class MSManager : MonoBehaviour {
             }
         }
         Vector3 offset = new Vector3(5, 0, 0);
-        StartCoroutine(GenerateMap("MainMap", incompleteMap, offset));
-
-        // Calculate Rules from sample
-        CalculateNeighborRules();
+        // incompleteMap[1, 1, 2] = 1;
+        GenerateMap("MainMap", incompleteMap, offset);
 
         // Print Rules (For Debugging)
         PrintRules();
+
+        // Collapse Tile
+        CollapseTile(1, 1, 1, 1);
+
+    }
+
+    void CollapseTile(int i, int j, int k, int tileIndex){
+        ContainerScript tile = incompleteMapTransforms[i, j, k];
+        if(tile == null){
+            Debug.Log("Already Collpsed");
+            return;
+        }
+        incompleteMap[i, j, k] = tileIndex;
+        tile.Collapse(tiles, tileIndex);
+
+        // Clean Neighbors
+        CleanNeighbors(i, j, k);
+    }
+
+    void CleanNeighbors(int i, int j, int k){
+        ContainerScript tile = incompleteMapTransforms[i, j, k];
+
+        // if(tile.isVisited) return;
+
+        int iMax = incompleteMap.GetLength(0);
+        int jMax = incompleteMap.GetLength(1);
+        int kMax = incompleteMap.GetLength(2);
+
+        List<int> possibleTiles;
+        if (tile != null){
+            possibleTiles = new List<int>(tile.allowedTiles);
+        }
+        else{
+            possibleTiles = new List<int> { incompleteMap[i, j, k] };
+        }
+
+        Debug.Log(string.Join(",",possibleTiles));
+
+        for (int t = 0; t < possibleTiles.Count; t++){
+            int tileIndex = possibleTiles[t];
+            ContainerScript up, down, right, left, forward, backward;
+            // Get Neighbors
+            if (j > 0){
+                up = incompleteMapTransforms[i, j - 1, k];
+                up.CleanTiles(rules[tileIndex, 0], tiles);
+                // Update the incompleteMap if tile is collapsed
+                if(up.isCollapsed) incompleteMap[i, j, k] = up.tileNo;
+                CleanNeighbors(i, j - 1, k);
+            }
+            if (j < jMax-1){
+                down = incompleteMapTransforms[i, j + 1, k];
+                down.CleanTiles(rules[tileIndex, 1], tiles);
+                // Update the incompleteMap if tile is collapsed
+                if(down.isCollapsed) incompleteMap[i, j, k] = down.tileNo;
+                CleanNeighbors(i, j + 1, k);
+            }
+            if (i < iMax-1){
+                right = incompleteMapTransforms[i + 1, j, k];
+                right.CleanTiles(rules[tileIndex, 2], tiles);
+                if(right.isCollapsed) incompleteMap[i, j, k] = right.tileNo;
+                CleanNeighbors(i + 1, j, k);
+            }
+            if (i > 0){
+                left = incompleteMapTransforms[i - 1, j, k];
+                left.CleanTiles(rules[tileIndex, 3], tiles);
+                if(left.isCollapsed) incompleteMap[i, j, k] = left.tileNo;
+                CleanNeighbors(i - 1, j, k);
+            }
+            if (k < kMax-1){
+                forward = incompleteMapTransforms[i, j, k + 1];
+                forward.CleanTiles(rules[tileIndex, 4], tiles);
+                if(forward.isCollapsed) incompleteMap[i, j, k] = forward.tileNo;
+                CleanNeighbors(i, j, k + 1);
+            }
+            if (k > 0){
+                backward = incompleteMapTransforms[i, j, k - 1];
+                backward.CleanTiles(rules[tileIndex, 5], tiles);
+                if(backward.isCollapsed) incompleteMap[i, j, k] = backward.tileNo;
+                CleanNeighbors(i, j, k - 1);
+            }
+        }
+
     }
 
     // Generate Map Based on map matrix
-    IEnumerator GenerateMap(string mapName, int[,,] map, Vector3 offset){
+    void GenerateMap(string mapName, int[,,] map, Vector3 offset){
         Transform mapParent = Instantiate(new GameObject(name:mapName), transform).transform;
 
         for(int i = 0; i < map.GetLength(0); i++){
@@ -53,13 +138,20 @@ public class MSManager : MonoBehaviour {
 
                     int tileIndex = map[i, j, k];
                     
-                    GameObject model = tileIndex < 0 ? containerTile : tiles[tileIndex];
                     Vector3 pos = new Vector3(i + offset.x, j + offset.y, k + offset.z);
                     Quaternion rot = Quaternion.identity;
 
-                    // Create tile, parent to mapParent
-                    Transform tile = Instantiate(model, pos, rot, mapParent).transform;
-                    yield return new WaitForSeconds(0.05f);
+                    if (tileIndex < 0){
+                        ContainerScript tile = Instantiate(containerTile, pos, rot, mapParent).GetComponent<ContainerScript>();
+                        for(int t = 0; t < tiles.Length; t++){
+                            tile.AddAllowedTile(t);
+                        }
+                        incompleteMapTransforms[i,j,k] = tile;
+                    }else{
+
+                        // Create tile, parent to mapParent
+                        Transform tile = Instantiate(tiles[tileIndex], pos, rot, mapParent).transform;
+                    }
                 }
             }
         }
