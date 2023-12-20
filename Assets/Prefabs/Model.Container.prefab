@@ -119,7 +119,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04a389784036cb260a088030f09abd4e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  outline: {fileID: 0}
+  outline: {fileID: 4395780292335449995}
+  renderer: {fileID: 7794089884456056547}
+  isCollapsed: 0
 --- !u!114 &4395780292335449995
 MonoBehaviour:
   m_ObjectHideFlags: 0
