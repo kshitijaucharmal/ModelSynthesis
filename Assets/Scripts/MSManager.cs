@@ -1,6 +1,7 @@
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class MSManager : MonoBehaviour {
@@ -21,6 +22,7 @@ public class MSManager : MonoBehaviour {
 	private HashSet<int>[,] rules;
 
 	private int[,,] incompleteMap;
+	private bool[,,] visitedMap;
 	private ContainerScript[,,] containers;
 
 	// Start is called before the first frame update
@@ -28,6 +30,7 @@ public class MSManager : MonoBehaviour {
 		// Initilize
 		sampleMap = new int[iMax, jMax, kMax];
 		incompleteMap = new int[iMax, jMax, kMax];
+		visitedMap = new bool[iMax, jMax, kMax];
 		containers = new ContainerScript[iMax, jMax, kMax];
 
 		// Sample Map
@@ -45,7 +48,7 @@ public class MSManager : MonoBehaviour {
 				}
 			}
 		}
-		Vector3 offset = new Vector3(5, 0, 0);
+		Vector3 offset = new Vector3(iMax + 1, 0, 0);
 		GenerateMap("MainMap", incompleteMap, offset);
 
 		// Calculate Rules from sample
@@ -53,11 +56,23 @@ public class MSManager : MonoBehaviour {
 
 		// Print Rules (For Debugging)
 		PrintRules();
+
+		// Collapse 
+		for(int t = 0; t < 200; t++){
+			int x = Random.Range(0, iMax);
+			int y = Random.Range(0, jMax);
+			int z = Random.Range(0, kMax);
+			CollapseTile(x, y, z, -1);
+		}
 	}
+
+	// Vector3Int lowestEntropyTile(){
+		
+	// }
 	
 	void CollapseTile(int i, int j, int k, int tileIndex){
 		ContainerScript tile = containers[i,j,k];
-		if(tile == null){
+		if(tile == null || tile.isCollapsed){
 			// Not empty
 			return;
 		}
@@ -67,25 +82,81 @@ public class MSManager : MonoBehaviour {
 
 		// Clean
 		CleanNeighbors(i, j, k);
+		
+		// Reset the visited map
+		visitedMap = new bool[iMax, jMax, kMax];
+
 	}
 
 	// This is gonna be a recursive function
 	void CleanNeighbors(int i, int j, int k){
 		ContainerScript tile = containers[i,j,k];
-		if(tile == null){
-			// Not empty
+		if(tile.allowedTiles.Count == 0 || visitedMap[i,j,k]){
+			// Already Collapsed
 			return;
 		}
+		visitedMap[i,j,k] = true;
 
-		ContainerScript up, down, right, left, forward, backward;
-		
+		int[] possibleStates = tile.allowedTiles.ToArray();
+
+		ContainerScript up = null, 
+						down = null, 
+						right = null, 
+						left = null, 
+						forward = null, 
+						backward = null;
+
 		// Get Neighbors
-		if (j > 0)      up          = containers[i, j - 1, k];
-		if (j < jMax-1) down        = containers[i, j + 1, k];
+		if (j < jMax-1) up        	= containers[i, j + 1, k];
+		if (j > 0)      down        = containers[i, j - 1, k];
 		if (i < iMax-1) right       = containers[i + 1, j, k];
 		if (i > 0)      left        = containers[i - 1, j, k];
 		if (k < kMax-1) forward     = containers[i, j, k + 1];
 		if (k > 0)      backward	= containers[i, j, k - 1];
+
+		// Calculate Possibilties
+		if(up != null){
+			var r = CalculateRemovals(possibleStates, 1);
+			up.AddValidTiles(r, tiles);
+			CleanNeighbors(i, j + 1, k);
+		}
+		if(down != null){
+			var r = CalculateRemovals(possibleStates, 0);
+			down.AddValidTiles(r, tiles);
+			CleanNeighbors(i, j - 1, k);
+		}
+		if(right != null){
+			var r = CalculateRemovals(possibleStates, 3);
+			right.AddValidTiles(r, tiles);
+			CleanNeighbors(i + 1, j, k);
+		}
+		if(left != null){
+			var r = CalculateRemovals(possibleStates, 2);
+			left.AddValidTiles(r, tiles);
+			CleanNeighbors(i - 1, j, k);
+		}
+		if(forward != null){
+			var r = CalculateRemovals(possibleStates, 5);
+			forward.AddValidTiles(r, tiles);
+			CleanNeighbors(i, j, k + 1);
+		}
+		if(backward != null){
+			var r = CalculateRemovals(possibleStates, 4);
+			backward.AddValidTiles(r, tiles);
+			CleanNeighbors(i, j, k - 1);
+		}
+
+	}
+
+	HashSet<int> CalculateRemovals(int[] possibleStates, int dir){
+		HashSet<int> poss = new HashSet<int>();
+		foreach(int t in possibleStates){
+			var p = rules[t, dir];
+			foreach(int f in p){
+				poss.Add(f);
+			}
+		}
+		return poss;
 	}
 
 	// Generate Map Based on map matrix
@@ -103,6 +174,7 @@ public class MSManager : MonoBehaviour {
 					if (tileIndex < 0){
 						// Create tile, parent to mapParent
 						ContainerScript tile = Instantiate(containerTile, pos, rot, mapParent).GetComponent<ContainerScript>();
+						tile.AddAllTiles(tiles.Length);
 						containers[i,j,k] = tile;
 					}
 					else{
@@ -137,13 +209,13 @@ public class MSManager : MonoBehaviour {
 					
 					int up, down, right, left, forward, backward;
 
-					if (j > 0){
-						up = sampleMap[i, j - 1, k];
-						rules[tileIndex, 0].Add(up);
-					}
 					if (j < jMax-1){
-						down = sampleMap[i, j + 1, k];
-						rules[tileIndex, 1].Add(down);
+						up = sampleMap[i, j + 1, k];
+						rules[tileIndex, 1].Add(up);
+					}
+					if (j > 0){
+						down = sampleMap[i, j - 1, k];
+						rules[tileIndex, 0].Add(down);
 					}
 					if (i < iMax-1){
 						right = sampleMap[i + 1, j, k];
@@ -161,6 +233,15 @@ public class MSManager : MonoBehaviour {
 						backward = sampleMap[i, j, k - 1];
 						rules[tileIndex, 5].Add(backward);
 					}
+				}
+			}
+		}
+		// Add an air tile where nothing present
+		for(int i = 0; i < rules.GetLength(0); i++){
+			for(int j = 0; j < rules.GetLength(1); j++){
+				if(rules[i,j].Count == 0){
+					// 0 is Air tile
+					rules[i,j].Add(0);
 				}
 			}
 		}
