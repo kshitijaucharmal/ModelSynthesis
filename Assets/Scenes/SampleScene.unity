@@ -268,7 +268,7 @@ MonoBehaviour:
   - {fileID: 5326631194982526162, guid: 7a6d5eede3f08fe858ace676a334fc49, type: 3}
   containerTile: {fileID: 6134049266159568348, guid: f4bb95cb2dae27b1798fc7c8c9ae1b2d, type: 3}
   sampleDim: {x: 4, y: 4, z: 4}
-  mainDim: {x: 10, y: 5, z: 10}
+  mainDim: {x: 20, y: 6, z: 20}
 --- !u!1 &963194225
 GameObject:
   m_ObjectHideFlags: 0
