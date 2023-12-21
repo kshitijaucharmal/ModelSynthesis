@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class MSManager : MonoBehaviour {
@@ -11,9 +10,8 @@ public class MSManager : MonoBehaviour {
 	[SerializeField] private GameObject containerTile;
 
 	[Header("Map Dimensions")]
-	[SerializeField] private int iMax = 4;
-	[SerializeField] private int jMax = 4;
-	[SerializeField] private int kMax = 4;
+	[SerializeField] private Vector3Int sampleDim = new Vector3Int(4, 4, 4);
+	[SerializeField] private Vector3Int mainDim = new Vector3Int(6, 6, 6);
 
 	private int[,,] sampleMap;
 
@@ -27,18 +25,19 @@ public class MSManager : MonoBehaviour {
 
 	// Start is called before the first frame update
 	void Start() {
-		// Initilize
-		sampleMap = new int[iMax, jMax, kMax];
-		incompleteMap = new int[iMax, jMax, kMax];
-		visitedMap = new bool[iMax, jMax, kMax];
-		containers = new ContainerScript[iMax, jMax, kMax];
+		// Initialize
+		sampleMap = new int[sampleDim.x, sampleDim.y, sampleDim.y];
+
+		incompleteMap = new int[mainDim.x, mainDim.y, mainDim.z];
+		visitedMap = new bool[mainDim.x, mainDim.y, mainDim.z];
+		containers = new ContainerScript[mainDim.x, mainDim.y, mainDim.z];
 
 		// Sample Map
 		sampleMap[2, 3, 2] = 1;
 		sampleMap[2, 2, 2] = 2;
 		sampleMap[2, 1, 2] = 2;
 		sampleMap[2, 0, 2] = 3;
-		GenerateMap("SampleMap", sampleMap, Vector3.zero);
+		GenerateMap("SampleMap", sampleMap, offset:Vector3.zero);
 
 		// Main Map
 		for(int i = 0; i < incompleteMap.GetLength(0); i++){
@@ -48,7 +47,7 @@ public class MSManager : MonoBehaviour {
 				}
 			}
 		}
-		Vector3 offset = new Vector3(iMax + 1, 0, 0);
+		Vector3 offset = new Vector3(sampleDim.x + 1, 0, 0);
 		GenerateMap("MainMap", incompleteMap, offset);
 
 		// Calculate Rules from sample
@@ -58,11 +57,12 @@ public class MSManager : MonoBehaviour {
 		PrintRules();
 
 		// Collapse 
-		for(int t = 0; t < 200; t++){
-			int x = Random.Range(0, iMax);
-			int y = Random.Range(0, jMax);
-			int z = Random.Range(0, kMax);
-			CollapseTile(x, y, z, -1);
+		for(int x = 0; x < mainDim.x; x++){
+			for(int y = 0; y < mainDim.y; y++){
+				for(int z = 0; z < mainDim.z; z++){
+					CollapseTile(x, y, z, -1);
+				}
+			}
 		}
 	}
 
@@ -84,7 +84,7 @@ public class MSManager : MonoBehaviour {
 		CleanNeighbors(i, j, k);
 		
 		// Reset the visited map
-		visitedMap = new bool[iMax, jMax, kMax];
+		visitedMap = new bool[mainDim.x, mainDim.y, mainDim.z];
 
 	}
 
@@ -107,11 +107,11 @@ public class MSManager : MonoBehaviour {
 						backward = null;
 
 		// Get Neighbors
-		if (j < jMax-1) up        	= containers[i, j + 1, k];
+		if (j < mainDim.y-1) up        	= containers[i, j + 1, k];
 		if (j > 0)      down        = containers[i, j - 1, k];
-		if (i < iMax-1) right       = containers[i + 1, j, k];
+		if (i < mainDim.x-1) right       = containers[i + 1, j, k];
 		if (i > 0)      left        = containers[i - 1, j, k];
-		if (k < kMax-1) forward     = containers[i, j, k + 1];
+		if (k < mainDim.z-1) forward     = containers[i, j, k + 1];
 		if (k > 0)      backward	= containers[i, j, k - 1];
 
 		// Calculate Possibilties
@@ -198,9 +198,9 @@ public class MSManager : MonoBehaviour {
 			}
 		}
 
-		for(int i = 0; i < iMax; i++){
-			for(int j = 0 ; j < jMax; j++){
-				for(int k = 0 ; k < kMax; k++){
+		for(int i = 0; i < sampleDim.x; i++){
+			for(int j = 0 ; j < sampleDim.y; j++){
+				for(int k = 0 ; k < sampleDim.z; k++){
 					int tileIndex = sampleMap[i, j, k];
 
 					if (tileIndex < 0){
@@ -209,7 +209,7 @@ public class MSManager : MonoBehaviour {
 					
 					int up, down, right, left, forward, backward;
 
-					if (j < jMax-1){
+					if (j < sampleDim.y-1){
 						up = sampleMap[i, j + 1, k];
 						rules[tileIndex, 1].Add(up);
 					}
@@ -217,7 +217,7 @@ public class MSManager : MonoBehaviour {
 						down = sampleMap[i, j - 1, k];
 						rules[tileIndex, 0].Add(down);
 					}
-					if (i < iMax-1){
+					if (i < sampleDim.x-1){
 						right = sampleMap[i + 1, j, k];
 						rules[tileIndex, 2].Add(right);
 					}
@@ -225,7 +225,7 @@ public class MSManager : MonoBehaviour {
 						left = sampleMap[i - 1, j, k];
 						rules[tileIndex, 3].Add(left);
 					}
-					if (k < kMax-1){
+					if (k < sampleDim.z-1){
 						forward = sampleMap[i, j, k + 1];
 						rules[tileIndex, 4].Add(forward);
 					}
